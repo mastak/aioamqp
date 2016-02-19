@@ -1,0 +1,26 @@
+version: '2'
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: aioamqp_rabbitmq
+    hostname: sync_rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=admin
+      - RABBITMQ_NODENAME=my-rabbit
+    ports:
+     - "5672:5672"
+     - "15672:15672"
+
+  aioamqp:
+    build: .
+    environment:
+      - AMQP_HOST=rabbitmq
+      - AMQP_USER=admin
+      - AMQP_PASSWORD=admin
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+    volumes:
+      - .:/usr/src/app

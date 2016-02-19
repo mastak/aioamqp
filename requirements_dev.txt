@@ -3,4 +3,5 @@
 nose
 coverage
 pylint==1.1.0
-pyrabbit
+#pyrabbit
+-e git+https://github.com/bkjones/pyrabbit.git#egg=pyrabbit

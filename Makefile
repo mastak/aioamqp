@@ -26,7 +26,13 @@ livehtml: docs
 test:
 	$(NOSETESTS) --verbosity=2 aioamqp
 
+docker_test:
+	docker-compose up -d rabbitmq
+	docker-compose build aioamqp
+	docker-compose run --rm --entrypoint=bash aioamqp -c "while ! curl -s rabbitmq:15672 > /dev/null; do echo waiting for rabbitmq; sleep 1; done"
+	docker-compose up aioamqp
+	docker-compose stop
+	docker-compose rm -f
 
 update:
 	pip install -r requirements_dev.txt
-

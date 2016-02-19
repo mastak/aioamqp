@@ -79,10 +79,15 @@ class RabbitTestCase(testing.AsyncioTestCaseMixin):
 
     def setUp(self):
         super().setUp()
-        self.host = os.environ.get('AMQP_HOST', 'localhost')
-        self.port = os.environ.get('AMQP_PORT', 5672)
-        self.vhost = os.environ.get('AMQP_VHOST', self.VHOST)
-        self.http_client = pyrabbit.api.Client('localhost:15672', 'guest', 'guest')
+        self.host = os.getenv('AMQP_HOST', 'localhost')
+        self.port = os.getenv('AMQP_PORT', 5672)
+        self.management_port = os.getenv('AMQP_MANAGEMENT_PORT', 15672)
+        self.vhost = os.getenv('AMQP_VHOST', self.VHOST)
+        self.user = os.getenv('AMQP_USER', 'admin')
+        self.password = os.getenv('AMQP_PASSWORD', 'admin')
+
+        self.http_client = pyrabbit.api.Client(
+            '{}:{}/api/'.format(self.host, self.management_port), self.user, self.password)
 
         self.amqps = []
         self.channels = []
@@ -100,14 +105,13 @@ class RabbitTestCase(testing.AsyncioTestCaseMixin):
 
         self.http_client.create_vhost(self.vhost)
         self.http_client.set_vhost_permissions(
-            vname=self.vhost, username='guest', config='.*', rd='.*', wr='.*',
+            vname=self.vhost, username=self.user, config='.*', rd='.*', wr='.*',
         )
 
         @asyncio.coroutine
         def go():
             transport, protocol = yield from self.create_amqp()
-            channel = yield from self.create_channel(amqp=protocol)
-            self.channels.append(channel)
+            yield from self.create_channel(amqp=protocol)
         self.loop.run_until_complete(go())
 
     def tearDown(self):
@@ -128,7 +132,7 @@ class RabbitTestCase(testing.AsyncioTestCaseMixin):
                 yield from amqp.close()
                 del amqp
             for transport in self.transports:
-                self.transport.close()
+                transport.close()
         self.loop.run_until_complete(go())
         super().tearDown()
 
@@ -183,7 +187,7 @@ class RabbitTestCase(testing.AsyncioTestCaseMixin):
 
     def list_queues(self, vhost=None, fully_qualified_name=False):
         # wait for the http client to get the correct state of the queue
-        time.sleep(int(os.environ.get('AMQP_REFRESH_TIME', 3)))
+        time.sleep(int(os.getenv('AMQP_REFRESH_TIME', 3)))
         queues_list = self.http_client.get_queues(vhost=vhost or self.vhost)
         queues = {}
         for queue_info in queues_list:
@@ -285,7 +289,8 @@ class RabbitTestCase(testing.AsyncioTestCaseMixin):
         def protocol_factory(*args, **kw):
             return ProxyAmqpProtocol(self, *args, **kw)
         vhost = vhost or self.vhost
-        transport, protocol = yield from aioamqp_connect(host=self.host, port=self.port, virtualhost=vhost,
+        transport, protocol = yield from aioamqp_connect(host=self.host,
+            port=self.port, login=self.user, password=self.password, virtualhost=vhost,
             protocol_factory=protocol_factory, loop=self.loop)
         self.amqps.append(protocol)
         self.transports.append(transport)
